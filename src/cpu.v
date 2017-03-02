@@ -182,6 +182,7 @@ module CPU(input clk, input ce, input reset,
   reg [7:0] IR;
   reg [2:0] State;
   reg GotInterrupt;
+  reg [2:0] NextState;
   
   reg IsResetInterrupt;
   wire [15:0] PC;
@@ -205,17 +206,6 @@ module CPU(input clk, input ce, input reset,
   wire [7:0] NextIR = (State == 0) ? (GotInterrupt ? 8'd0 : DIN) : IR;
   wire IsBranchCycle1 = (IR[4:0] == 5'b10000) && State[0];
 
-  // Compute next state.
-  reg [2:0] NextState;
-  always begin
-    case (StateCtrl)
-    0: NextState = State + 3'd1;
-    1: NextState = (AXCarry ? 3'd4 : 3'd5);
-    2: NextState = (IsBranchCycle1 && JumpTaken) ? 2 : 0; // Override next state if the branch is taken.
-    3: NextState = (JumpNoOverflow ? 3'd0 : 3'd4);
-    endcase
-  end
-
   wire [15:0] AX;
   wire AXCarry;
 AddressGenerator addgen(clk, ce, AddrCtrl, {IrFlags[0], IrFlags[1]}, DIN, T, X, Y, AX, AXCarry);
@@ -227,6 +217,16 @@ MicroCodeTable micro2(clk, ce, reset, NextIR, NextState, MicroCode);
   wire [7:0] AluIntR;
   wire CO, VO, SO,ZO;
 NewAlu new_alu(IrFlags[15:5], A,X,Y,SP,DIN,T, P[0], P[6], CO, VO, SO, ZO, AluR, AluIntR);
+
+  // Compute next state.
+  always begin
+    case (StateCtrl)
+    0: NextState = State + 3'd1;
+    1: NextState = (AXCarry ? 3'd4 : 3'd5);
+    2: NextState = (IsBranchCycle1 && JumpTaken) ? 2 : 0; // Override next state if the branch is taken.
+    3: NextState = (JumpNoOverflow ? 3'd0 : 3'd4);
+    endcase
+  end
 
 // Registers
 always @(posedge clk) if (reset) begin
