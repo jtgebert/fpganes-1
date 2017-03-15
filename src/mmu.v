@@ -15,7 +15,7 @@ module MMC0(input clk, input ce,
   assign prg_aout = {7'b00_0000_0, prg_ain[14:0]};
   assign prg_allow = prg_ain[15] && !prg_write;
   assign chr_allow = flags[15];
-  assign chr_aout = {9'b10_0000_000, chr_ain[12:0]};
+            assign chr_aout = {9'b00_0100_000, chr_ain[12:0]};
   assign vram_ce = chr_ain[13];
   assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
 endmodule
