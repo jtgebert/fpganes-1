@@ -312,10 +312,17 @@ always @(posedge clk) begin
   last_joypad_clock <= joypad_clock;
 end
   
+	
+//force outputs
+assign loader_write = 0;
+assign loader_done = 1;
+assign loader_fail = 0;
+assign mapper_flags = 32'h00004100;
+/* ROM PRELOADED 
 // Load ROMs
 GameLoader loader(clk, loader_reset, loader_input, loader_clk,
                   loader_addr, loader_write_data, loader_write,
-                  mapper_flags, loader_done, loader_fail);
+                  mapper_flags, loader_done, loader_fail); */
 
   // NES is clocked at every 4th cycle.
 always @(posedge clk)
