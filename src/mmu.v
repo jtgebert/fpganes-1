@@ -1697,6 +1697,9 @@ module MultiMapper(input clk, input ce, input ppu_ce, input reset,
     has_chr_dout = 0;
     chr_dout = mmc5_chr_dout;
         
+    // force MMC0
+    {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow} = {mmc0_prg_addr, mmc0_prg_allow, mmc0_chr_addr, mmc0_vram_a10, mmc0_vram_ce, mmc0_chr_allow};
+    /*
     case(flags[7:0])
     1:  {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}      = {mmc1_prg_addr, mmc1_prg_allow, mmc1_chr_addr, mmc1_vram_a10, mmc1_vram_ce, mmc1_chr_allow};
     9:  {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}      = {mmc2_prg_addr, mmc2_prg_allow, mmc2_chr_addr, mmc2_vram_a10, mmc2_vram_ce, mmc2_chr_allow};
@@ -1738,21 +1741,21 @@ module MultiMapper(input clk, input ce, input ppu_ce, input reset,
     228: {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}     = {map228_prg_addr, map228_prg_allow, map228_chr_addr, map228_vram_a10, map228_vram_ce, map228_chr_allow};
     234: {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}     = {map234_prg_addr, map234_prg_allow, map234_chr_addr, map234_vram_a10, map234_vram_ce, map234_chr_allow};
     default: {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow} = {mmc0_prg_addr, mmc0_prg_allow, mmc0_chr_addr, mmc0_vram_a10, mmc0_vram_ce, mmc0_chr_allow};
-    endcase
-    if (prg_aout[21:20] == 2'b00)
+    endcase*/
+    if (prg_aout[21:17] == 2'b00000)
       prg_aout[19:0] = {prg_aout[19:14] & prg_mask, prg_aout[13:0]};
-    if (chr_aout[21:20] == 2'b10)
+    if (chr_aout[21:17] == 5'b00010)
       chr_aout[19:0] = {chr_aout[19:13] & chr_mask, chr_aout[12:0]};
     // Remap the CHR address into VRAM, if needed.
-    chr_aout = vram_ce ? {11'b11_0000_0000_0, vram_a10, chr_ain[9:0]} : chr_aout;
-    prg_aout = (prg_ain < 'h2000) ? {11'b11_1000_0000_0, prg_ain[10:0]} : prg_aout;
+              chr_aout = vram_ce ? {11'b00_0110_0000_0, vram_a10, chr_ain[9:0]} : chr_aout;
+              prg_aout = (prg_ain < 'h2000) ? {11'b00_0111_0000_0, prg_ain[10:0]} : prg_aout;
     prg_allow = prg_allow || (prg_ain < 'h2000);
   end
 endmodule
 
-// PRG       = 0....
-// CHR       = 10...
-// CHR-VRAM  = 1100
-// CPU-RAM   = 1110
-// CARTRAM   = 1111
+// PRG       = 0000....
+// CHR       = 00010...
+// CHR-VRAM  = 0001100
+// CPU-RAM   = 0001110
+// CARTRAM   = 0001111
                  
