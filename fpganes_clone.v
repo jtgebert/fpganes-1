@@ -142,7 +142,7 @@ module GameLoader(input clk, input reset,
             end
           end else if (state == 1) begin
             state <= 2;
-            mem_addr <= 22'b10_0000_0000_0000_0000_0000; // Address for CHR
+            mem_addr <= 22'b00_0100_0000_0000_0000_0000; // Address for CHR
             bytes_left <= {1'b0, chrrom, 13'b0};
           end else if (state == 2) begin
             done <= 1;
