@@ -1,8 +1,6 @@
 // Copyright (c) 2012-2013 Ludvig Strigeus
 // This program is GPL Licensed. See COPYING for the full license.
 
-`include "MicroCode.v"
-
 module MyAddSub(input [7:0] A,B,
                 input CI,ADD,
                 output [7:0] S,

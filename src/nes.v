@@ -1,10 +1,7 @@
 // Copyright (c) 2012-2013 Ludvig Strigeus
 // This program is GPL Licensed. See COPYING for the full license.
 
-`include "cpu.v"
-`include "apu.v"
-`include "ppu.v"
-`include "mmu.v"
+
 
 // Sprite DMA Works as follows.
 // When the CPU writes to $4014 DMA is initiated ASAP.
