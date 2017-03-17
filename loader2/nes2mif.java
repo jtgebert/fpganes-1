@@ -44,7 +44,7 @@ public class nes2mif {
       charRomLength = 8192;
 
       // print mif headers to the output files
-      progRomPrinter.println("DEPTH = 266239;\nWIDTH = 16;\nADDRESS_RADIX = HEX;"
+      progRomPrinter.println("DEPTH = 266248;\nWIDTH = 16;\nADDRESS_RADIX = HEX;"
                               + "\nDATA_RADIX = BIN;\nCONTENT\nBEGIN\n");
 
       // loop over all bytes and print them to correct rom file
@@ -83,6 +83,8 @@ public class nes2mif {
         */
       }
 
+	  progRomPrinter.print("END");
+	  
       progRomPrinter.close();
 
     }

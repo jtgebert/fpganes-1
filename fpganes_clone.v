@@ -244,7 +244,7 @@ wire loader_reset = loader_conf[0];
 wire loader_write;
 wire [31:0] mapper_flags;
 wire loader_done, loader_fail;
-wire reset_nes = (KEY[0] || !loader_done);
+wire reset_nes = (~KEY[0] || !loader_done);
 wire run_mem = (nes_ce == 0) && !reset_nes;
 wire run_nes = (nes_ce == 3) && !reset_nes;
 wire ram_busy;
@@ -261,8 +261,9 @@ wire AUD_MCLK; // do nothing with audio signals
 wire AUD_LRCK;
 wire AUD_SCK;
 wire AUD_SDIN;
-
-
+assign LEDR = {6'h00, run_mem, run_nes, reset_nes};
+wire[3:0] vga_r, vga_g, vga_b;
+wire vga_v, vga_h;
 
 //=======================================================
 //  Structural coding
@@ -292,6 +293,7 @@ initial $readmemh("src/nes_palette.txt", pallut);
 
 // LED Display
 assign HEX5 = 7'b0101011;
+
 assign HEX4 = 7'b0000110;
 assign HEX3 = 7'b0010010;
 assign HEX2 = 7'b0101011;
@@ -356,7 +358,7 @@ NES nes(clk, reset_nes, run_nes,
 */
 		  
 wire[22:0] MemAdr;
-wire[15:0] MemDB;
+wire[15:0] MemDB, MemDB_wr, MemDB_rd;
 wire[1:0] ByteMask;
 wire RamCS, RamCRE, MemClk, MemWait, MemAdv, MemWR, MemOE;
 		  
@@ -366,11 +368,13 @@ ram	ram_inst (
 	.byteena ( ByteMask ),
 	.clken ( 1 ),
 	.clock ( clk ),
-	.data ( MemDB ),
+	.data ( MemDB_wr ),
 	.wren ( MemWR ),
-	.q ( MemDB )
+	.q ( MemDB_rd )
 	);
 
+assign MemDB = MemOE ? 16'hzzzz : MemDB_rd;
+assign MemDB_wr = MemOE ? MemDB : 16'hzzzz;
 
 // This is the memory controller to access the board's PSRAM
 MemoryController memory(clk,
@@ -392,6 +396,17 @@ always @(posedge clk) begin
   else
     ramfail <= ram_busy && loader_write || ramfail;
 end
+
+assign VGA_CLK = clk;
+assign VGA_BLANK_N = 1'b1;
+assign VGA_SYNC_N = 1'b0;
+
+assign VGA_B = {4'h0, vga_b};
+assign VGA_G = {4'h0, vga_g};
+assign VGA_R = {4'h0, vga_r};
+assign VGA_HS = vga_h;
+assign VGA_VS = vga_v;
+
 
 VgaDriver vga(clk, vga_h, vga_v, vga_r, vga_g, vga_b, vga_hcounter, vga_vcounter, doubler_x, doubler_pixel, doubler_sync, SW[0]); // border 
 
