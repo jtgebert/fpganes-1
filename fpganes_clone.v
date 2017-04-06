@@ -1,5 +1,9 @@
 `timescale 1ns / 1ps
+/*foreach sig [find signals -recursive *] {
+    force $sig -deposit 0 -cancel {@1ns}
 
+  }
+*/
 // Asynchronous PSRAM controller for byte access
 // After outputting a byte to read, the result is available 70ns later.
 module MemoryController(
@@ -264,13 +268,20 @@ wire AUD_SDIN;
 assign LEDR = {6'h00, run_mem, run_nes, reset_nes};
 wire[3:0] vga_r, vga_g, vga_b;
 wire vga_v, vga_h;
-
+wire vga_stall;
 //=======================================================
 //  Structural coding
 //=======================================================
-system_clock clock_21mhz(.refclk(CLOCK_50), .rst(1'b0), .outclk_0(clk), .locked(clock_locked));
-//clk_wiz_v3_6 clock_21mhz(.CLK_IN1(CLK100MHZ), .CLK_OUT1(clk),  .RESET(1'b0), .LOCKED(clock_locked));
+`ifdef MODEL_TECH
+  // code for simulation with modelsim
+  assign clk_ungated=CLOCK_50;
 
+`else
+  system_clock clock_21mhz(.refclk(CLOCK_50), .rst(1'b0), .outclk_0(clk_ungated), .locked(clock_locked));// code for synthesis
+`endif
+
+//clk_wiz_v3_6 clock_21mhz(.CLK_IN1(CLK100MHZ), .CLK_OUT1(clk),  .RESET(1'b0), .LOCKED(clock_locked));
+  assign clk= clk_ungated & ~vga_stall;
 // UART
 // GPIO[3] as TX output, GPIO[5] as RX input
 assign UART_TXD = 1;
@@ -289,7 +300,7 @@ always @(posedge clk) begin
 end
 
 // NES Palette -> RGB332 conversion
-initial $readmemh("src/nes_palette.txt", pallut);
+initial $readmemh("I:/clone_fpganes/fpganes-1/src/nes_palette.txt", pallut);
 
 // LED Display
 assign HEX5 = 7'b0101011;
@@ -327,8 +338,13 @@ GameLoader loader(clk, loader_reset, loader_input, loader_clk,
                   mapper_flags, loader_done, loader_fail); */
 
   // NES is clocked at every 4th cycle.
-always @(posedge clk)
+always @(posedge clk) begin
+if(~KEY[0]) begin
+  nes_ce <= 'h0;
+end else begin
   nes_ce <= nes_ce + 1;
+end
+end
     
 NES nes(clk, reset_nes, run_nes,
         mapper_flags,
@@ -359,22 +375,128 @@ NES nes(clk, reset_nes, run_nes,
 		  
 wire[22:0] MemAdr;
 wire[15:0] MemDB, MemDB_wr, MemDB_rd;
+wire[15:0]  MemDB_rd_chrrom, MemDB_rd_chrram;
+wire[15:0]  MemDB_rd_cpuram, MemDB_rd_prgrom;
 wire[1:0] ByteMask;
 wire RamCS, RamCRE, MemClk, MemWait, MemAdv, MemWR, MemOE;
-		  
+
+wire cs_prgrom,cs_cpuram,cs_chrrom,cs_chrram;
+assign cs_prgrom=(MemAdr[20]== 1'b0);
+assign cs_cpuram=(MemAdr[20:18]== 3'b111);
+assign cs_chrrom=(MemAdr[20:19]== 2'b10);
+assign cs_chrram=(MemAdr[20:19]== 2'b110);
 // this ram block replaces the on board memory used in the nexys4
-ram	ram_inst (
-	.address ( MemAdr[19:0] ),
-	.byteena ( ByteMask ),
-	.clken ( 1 ),
+ram	ram_inst_prgrom (
+	.address ( {5'b0,MemAdr[14:0]} ),
+	.byteena ( ~ByteMask ),
+	//.clken ( 1'b1 ),
 	.clock ( clk ),
 	.data ( MemDB_wr ),
-	.wren ( MemWR ),
+	.wren ( ~MemWR & cs_prgrom ),
+	.q ( MemDB_rd_prgrom )
+	);
+/*cpuram	ram_inst_cpuram (
+	.address ( {1'b0,MemAdr[14:0]} ),
+	.byteena ( ~ByteMask ),
+	//.clken ( 1'b1 ),
+	.clock ( clk ),
+	.data ( MemDB_wr ),
+	.wren ( ~MemWR & cs_cpuram),
+	.q ( MemDB_rd_cpuram )
+	);*/
+reg[7:0] cpuram_array0[0:'hFFFF];
+reg[7:0] cpuram_array1[0:'hFFFF];
+integer i;
+always@(posedge clk) begin
+`ifdef MODEL_TECH
+ if (reset_nes) begin
+      begin
+        for (i=0; i<'hFFFF; i=i+1) begin
+			cpuram_array0[i] <= 15'h0;
+			cpuram_array1[i] <= 15'h0;
+			end
+      end
+`else
+	if(0) begin
+`endif
+  end else if(~MemWR & cs_cpuram) begin
+
+	if(~ByteMask[0]) begin
+		cpuram_array0[{1'b0,MemAdr[14:0]}]<=MemDB_wr[7:0];
+	end
+	if(~ByteMask[1]) begin
+		cpuram_array1[{1'b0,MemAdr[14:0]}]<=MemDB_wr[15:8];
+	end
+  end 
+end
+assign MemDB_rd_cpuram = {cpuram_array0[{1'b0,MemAdr[14:0]}],cpuram_array1[{1'b0,MemAdr[14:0]}]};//flips again before going to CPU
+
+ram	ram_inst_chrrom (
+	.address ( ({5'b0,MemAdr[14:0]} + 20'h4000 )),
+	.byteena ( ~ByteMask ),
+	//.clken ( 1'b1 ),
+	.clock ( clk ),
+	.data ( MemDB_wr ),
+	.wren ( ~MemWR & cs_chrrom),
+	.q ( MemDB_rd_chrrom )
+	);
+/*
+ram	ram_inst_chrram (
+	.address ( {5'b0,MemAdr[14:0]} ),
+	.byteena ( ~ByteMask ),
+	//.clken ( 1'b1 ),
+	.clock ( clk ),
+	.data ( MemDB_wr ),
+	.wren ( ~MemWR & cs_chrram),
+	.q ( MemDB_rd_chrram )
+	);
+	
+*/
+
+reg[7:0] chrram_array0[0:'hFFFF];
+reg[7:0] chrram_array1[0:'hFFFF];
+
+always@(posedge clk) begin
+`ifdef MODEL_TECH
+  if (reset_nes) begin
+      begin
+        for (i=0; i<'hFFFF; i=i+1) begin
+		chrram_array0[i] <= 15'h0;
+		chrram_array1[i] <= 15'h0;
+	end
+      end
+`else
+		
+	if(0) begin
+`endif
+  end else if(~MemWR & cs_chrram) begin
+
+  if(~ByteMask[0]) begin
+    chrram_array0[{1'b0,MemAdr[14:0]}]<=MemDB_wr[7:0];
+  end
+  if(~ByteMask[1]) begin
+    chrram_array1[{1'b0,MemAdr[14:0]}]<=MemDB_wr[15:8];
+  end
+  end 
+end
+assign MemDB_rd_chrram = {chrram_array0[{1'b0,MemAdr[14:0]}],chrram_array1[{1'b0,MemAdr[14:0]}]};
+
+	
+assign MemDB_rd = cs_cpuram? MemDB_rd_cpuram : (cs_prgrom ? MemDB_rd_prgrom : (cs_chrrom ?  MemDB_rd_chrrom : MemDB_rd_chrram));
+
+
+/*ram	ram_inst (
+	.address ( MemAdr[19:0] ),
+	.byteena ( ~ByteMask ),
+	.clken ( 1'b1 ),
+	.clock ( clk ),
+	.data ( MemDB_wr ),
+	.wren ( ~MemWR),
 	.q ( MemDB_rd )
 	);
-
-assign MemDB = MemOE ? 16'hzzzz : MemDB_rd;
-assign MemDB_wr = MemOE ? MemDB : 16'hzzzz;
+*/
+assign MemDB = MemOE ? 16'hzzzz : {MemDB_rd[7:0],MemDB_rd[15:8]};
+assign MemDB_wr = MemOE ? {MemDB[7:0],MemDB[15:8]} : 16'hzzzz;
 
 // This is the memory controller to access the board's PSRAM
 MemoryController memory(clk,
@@ -397,18 +519,24 @@ always @(posedge clk) begin
     ramfail <= ram_busy && loader_write || ramfail;
 end
 
+wire blank_n;
 assign VGA_CLK = clk;
-assign VGA_BLANK_N = 1'b1;
+assign VGA_BLANK_N = blank_n;
 assign VGA_SYNC_N = 1'b0;
 
 assign VGA_B = {4'h0, vga_b};
 assign VGA_G = {4'h0, vga_g};
 assign VGA_R = {4'h0, vga_r};
+
+//assign VGA_B = 'hFF;
+//assign VGA_G = 'h00;
+//assign VGA_R = 'h00;
+
 assign VGA_HS = vga_h;
 assign VGA_VS = vga_v;
 
 
-VgaDriver vga(clk, vga_h, vga_v, vga_r, vga_g, vga_b, vga_hcounter, vga_vcounter, doubler_x, doubler_pixel, doubler_sync, SW[0]); // border 
+VgaDriver vga(clk_ungated, vga_h, vga_v, vga_r, vga_g, vga_b, vga_hcounter, vga_vcounter, doubler_x,blank_n, vga_stall,doubler_pixel, doubler_sync, SW[0]); // border 
 
 Hq2x hq2x(clk, pixel_in, SW[5], // disable hq2x 
           scanline[8],        // reset_frame

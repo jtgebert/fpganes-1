@@ -54,7 +54,7 @@ module NewAlu(input  [10:0] OP, // ALU Operation
   // Determine left, right inputs to Add/Sub ALU.
   reg [7:0] L, R;
   reg CR;
-  always begin
+  always@* begin
     casez(o_left_input)
     0: L = A;
     1: L = Y;
@@ -79,7 +79,7 @@ module NewAlu(input  [10:0] OP, // ALU Operation
   wire AddCO, AddVO;
   MyAddSub addsub(.A(L),.B(IntR),.CI(o_second_op[0] ? CR : 1'b1),.ADD(!o_second_op[2]), .S(AddR), .CO(AddCO), .OFL(AddVO));
   // Produce the output of the second stage.
-  always begin
+  always@* begin
     casez(o_second_op)
     0:       {CO, Result} = {CR,    L | IntR};
     1:       {CO, Result} = {CR,    L & IntR};
@@ -153,7 +153,7 @@ module ProgramCounter(input clk, input ce,
   reg [15:0] NewPC;
   assign JumpNoOverflow = ((PC[8] ^ NewPC[8]) == 0) & LoadPC[0] & LoadPC[1];
 
-  always begin
+  always@* begin
     // Load PC Control
     case (LoadPC) 
     0,1: NewPC = PC + {15'b0, (LoadPC[0] & ~GotInterrupt)};
@@ -217,7 +217,7 @@ MicroCodeTable micro2(clk, ce, reset, NextIR, NextState, MicroCode);
 NewAlu new_alu(IrFlags[15:5], A,X,Y,SP,DIN,T, P[0], P[6], CO, VO, SO, ZO, AluR, AluIntR);
 
   // Compute next state.
-  always begin
+  always@* begin
     case (StateCtrl)
     0: NextState = State + 3'd1;
     1: NextState = (AXCarry ? 3'd4 : 3'd5);
@@ -262,7 +262,7 @@ always @(posedge clk) begin
 end
 
 // Generate outputs from module...
-always begin
+always@* begin
   dout = 8'bX;
   case (MemWrite[1:0])
   'b00: dout = T;
@@ -274,7 +274,7 @@ always begin
   mr = !mw;
 end
 
-always begin
+always@* begin
   case (AddrBus)
   0: aout = PC;
   1: aout = AX;

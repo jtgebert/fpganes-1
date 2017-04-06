@@ -1,7 +1,6 @@
 ram	ram_inst (
 	.address ( address_sig ),
 	.byteena ( byteena_sig ),
-	.clken ( clken_sig ),
 	.clock ( clock_sig ),
 	.data ( data_sig ),
 	.wren ( wren_sig ),

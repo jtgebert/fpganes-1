@@ -15,7 +15,7 @@ module MMC0(input clk, input ce,
   assign prg_aout = {7'b00_0000_0, prg_ain[14:0]};
   assign prg_allow = prg_ain[15] && !prg_write;
   assign chr_allow = flags[15];
-            assign chr_aout = {9'b00_0100_000, chr_ain[12:0]};
+  assign chr_aout = {9'b10_0000_000, chr_ain[12:0]};
   assign vram_ce = chr_ain[13];
   assign vram_a10 = flags[14] ? chr_ain[10] : chr_ain[11];
 endmodule
@@ -919,7 +919,7 @@ module Mapper15(input clk, input ce, input reset,
       {prg_rom_bank_mode, prg_rom_bank_lowbit, mirroring, prg_rom_bank} <= {prg_ain[1:0], prg_din[7:0]};
   end
   reg [6:0] prg_bank;
-  always begin
+  always@* begin
     casez({prg_rom_bank_mode, prg_ain[14]})
     // Bank mode 0 ( 32K ) / CPU $8000-$BFFF: Bank B / CPU $C000-$FFFF: Bank (B OR 1)
     3'b00_0: prg_bank = {prg_rom_bank, prg_ain[13]};
@@ -1000,7 +1000,7 @@ module Mapper28(input clk, input ce, input reset,
       end
     end
     
-    always begin
+    always@* begin
       // mirroring mode
       casez(mode[1:0])
       2'b0?   :   vram_a10 = {mode[0]};        // 1 screen lower
@@ -1198,7 +1198,7 @@ module Mapper68(input clk, input ce, input reset,
   assign prg_allow = prg_ain[15] && !prg_write;
 
   reg [6:0] chrout;  
-  always begin
+  always@* begin
     casez(chr_ain[12:11])
     0: chrout = chr_bank_0;
     1: chrout = chr_bank_1;
@@ -1280,7 +1280,7 @@ module Mapper69(input clk, input ce, input reset,
       endcase
     end
   end
-  always begin
+  always@* begin
     casez(mirroring[1:0])
     2'b00   :   vram_a10 = {chr_ain[10]};    // vertical
     2'b01   :   vram_a10 = {chr_ain[11]};    // horizontal
@@ -1289,7 +1289,7 @@ module Mapper69(input clk, input ce, input reset,
   end
   reg [4:0] prgout;
   reg [7:0] chrout;
-  always begin
+  always@* begin
     casez(prg_ain[15:13])
     3'b011:  prgout = prg_bank[0];
     3'b100:  prgout = prg_bank[1];
@@ -1337,7 +1337,7 @@ module Mapper71(input clk, input ce, input reset,
     end
   end
   reg [3:0] prgout;
-  always begin
+  always@* begin
     casez({prg_ain[14], mapper232})
     2'b0?: prgout = prg_bank;
     2'b10: prgout = 4'b1111;
@@ -1424,7 +1424,7 @@ module NesEvent(input clk, input ce, input reset,
   end
   // In the official tournament, 'C' was closed, and the others were open, so the counter had to reach $2800000.
   assign irq = (counter[29:25] == 5'b10100);
-  always begin
+  always@* begin
     if (!prg_ain[15]) begin
       // WRAM is always routed as usual.
       prg_aout = mmc1_aout; 
@@ -1697,10 +1697,7 @@ module MultiMapper(input clk, input ce, input ppu_ce, input reset,
     has_chr_dout = 0;
     chr_dout = mmc5_chr_dout;
         
-    // force MMC0
-    {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow} = {mmc0_prg_addr, mmc0_prg_allow, mmc0_chr_addr, mmc0_vram_a10, mmc0_vram_ce, mmc0_chr_allow};
-    /*
-    case(flags[7:0])
+    case(240)
     1:  {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}      = {mmc1_prg_addr, mmc1_prg_allow, mmc1_chr_addr, mmc1_vram_a10, mmc1_vram_ce, mmc1_chr_allow};
     9:  {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}      = {mmc2_prg_addr, mmc2_prg_allow, mmc2_chr_addr, mmc2_vram_a10, mmc2_vram_ce, mmc2_chr_allow};
     118, // TxSROM connects A17 to CIRAM A10.
@@ -1741,21 +1738,21 @@ module MultiMapper(input clk, input ce, input ppu_ce, input reset,
     228: {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}     = {map228_prg_addr, map228_prg_allow, map228_chr_addr, map228_vram_a10, map228_vram_ce, map228_chr_allow};
     234: {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow}     = {map234_prg_addr, map234_prg_allow, map234_chr_addr, map234_vram_a10, map234_vram_ce, map234_chr_allow};
     default: {prg_aout, prg_allow, chr_aout, vram_a10, vram_ce, chr_allow} = {mmc0_prg_addr, mmc0_prg_allow, mmc0_chr_addr, mmc0_vram_a10, mmc0_vram_ce, mmc0_chr_allow};
-    endcase*/
-    if (prg_aout[21:17] == 2'b00000)
+    endcase
+    if (prg_aout[21:20] == 2'b00)
       prg_aout[19:0] = {prg_aout[19:14] & prg_mask, prg_aout[13:0]};
-    if (chr_aout[21:17] == 5'b00010)
+    if (chr_aout[21:20] == 2'b10)
       chr_aout[19:0] = {chr_aout[19:13] & chr_mask, chr_aout[12:0]};
     // Remap the CHR address into VRAM, if needed.
-              chr_aout = vram_ce ? {11'b00_0110_0000_0, vram_a10, chr_ain[9:0]} : chr_aout;
-              prg_aout = (prg_ain < 'h2000) ? {11'b00_0111_0000_0, prg_ain[10:0]} : prg_aout;
+    chr_aout = vram_ce ? {11'b11_0000_0000_0, vram_a10, chr_ain[9:0]} : chr_aout;
+    prg_aout = (prg_ain < 'h2000) ? {11'b11_1000_0000_0, prg_ain[10:0]} : prg_aout;
     prg_allow = prg_allow || (prg_ain < 'h2000);
   end
 endmodule
 
-// PRG       = 0000....
-// CHR       = 00010...
-// CHR-VRAM  = 0001100
-// CPU-RAM   = 0001110
-// CARTRAM   = 0001111
+// PRG       = 0....
+// CHR       = 10... 100000000000 -> 10000004000
+// CHR-VRAM  = 1100
+// CPU-RAM   = 1110
+// CARTRAM   = 1111
                  
